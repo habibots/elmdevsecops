@@ -1,0 +1,12 @@
+# Site repos have their own .git; ignore their working trees from the meta repo
+GlobalManagement/
+sacred-portal-wellness/
+antiphazeprod/
+
+# OS / editor noise
+.DS_Store
+.vscode/
+.idea/
+
+# Reviews intentionally tracked (they ARE the audit artifact)
+!docs/
