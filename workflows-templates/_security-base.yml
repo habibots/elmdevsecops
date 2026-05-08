@@ -112,10 +112,12 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build local image
-        working-directory: ${{ inputs.working-directory }}
         run: |
-          if [[ -f Dockerfile ]]; then
-            docker build -t local-image:scan .
+          # Try the working-directory's Dockerfile first, then fall back to common
+          # infrastructure paths used by Pretix-style stacks.
+          WD="${{ inputs.working-directory }}"
+          if [[ -f "$WD/Dockerfile" ]]; then
+            docker build -t local-image:scan "$WD"
           elif [[ -f infrastructure/docker/caddy/Dockerfile ]]; then
             docker build -t local-image:scan -f infrastructure/docker/caddy/Dockerfile infrastructure/docker/caddy/
           else
