@@ -1,0 +1,205 @@
+name: _security-base
+on:
+  workflow_call:
+    inputs:
+      site-type:
+        type: string
+        required: true
+        description: "static | next | astro-ssr"
+      scan-containers:
+        type: boolean
+        default: false
+      dast-target-url:
+        type: string
+        required: false
+      semgrep-rulesets:
+        type: string
+        default: "p/owasp-top-ten p/javascript p/typescript"
+      node-version:
+        type: string
+        default: "22"
+      working-directory:
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+  attestations: write
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4 - full history for gitleaks
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+      - name: Run Semgrep
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          semgrep --config="${{ inputs.semgrep-rulesets }}" \
+                  --sarif --output semgrep.sarif \
+                  --error || true
+      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+        if: always()
+        with:
+          sarif_file: ${{ inputs.working-directory }}/semgrep.sarif
+          category: semgrep
+
+  sca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: google/osv-scanner-action@764c91816374ff2d8fc2095dab36eecd42d61638 # v1.9.2
+        with:
+          scan-args: |-
+            -r
+            --skip-git
+            ./
+      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: osv-scanner
+
+  iac:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Checkov
+        run: pip install --quiet checkov
+      - name: Run Checkov
+        run: |
+          checkov --directory . \
+                  --output sarif \
+                  --output-file-path checkov-results.sarif \
+                  --soft-fail || true
+      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+      - name: Install actionlint
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash
+          sudo mv actionlint /usr/local/bin/
+      - name: Run actionlint
+        run: actionlint
+      - uses: woodruffw/zizmor-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+
+  container:
+    if: ${{ inputs.scan-containers }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Build local image
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [[ -f Dockerfile ]]; then
+            docker build -t local-image:scan .
+          elif [[ -f infrastructure/docker/caddy/Dockerfile ]]; then
+            docker build -t local-image:scan -f infrastructure/docker/caddy/Dockerfile infrastructure/docker/caddy/
+          else
+            echo "No Dockerfile found; skipping container scan"
+            exit 0
+          fi
+      - uses: aquasecurity/trivy-action@b2933f565dbc598b29947660e66259e3c7bc8561 # v0.20.0
+        with:
+          image-ref: local-image:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install conftest
+        run: |
+          curl -fsSL -o /tmp/conftest.tar.gz \
+            https://github.com/open-policy-agent/conftest/releases/download/v0.50.0/conftest_0.50.0_Linux_x86_64.tar.gz
+          tar xzf /tmp/conftest.tar.gz -C /tmp
+          sudo mv /tmp/conftest /usr/local/bin/
+          conftest --version
+      - name: Verify policy unit tests pass
+        if: hashFiles('policy/**/*.rego') != ''
+        run: conftest verify policy/
+      - name: Lint compose file (containers namespace)
+        if: hashFiles('infrastructure/docker/docker-compose.yml') != ''
+        run: conftest test infrastructure/docker/docker-compose.yml -p policy/ --namespace containers
+      - name: Lint compose file (alt path)
+        if: hashFiles('docker-compose.yml') != ''
+        run: conftest test docker-compose.yml -p policy/ --namespace containers
+      - name: Lint workflow files (github_actions namespace)
+        if: hashFiles('.github/workflows/*.yml') != ''
+        run: conftest test .github/workflows/*.yml -p policy/ --namespace github_actions
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm ci
+      - name: Build
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+        run: npm run build --if-present
+      - uses: anchore/sbom-action@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v0
+        with:
+          format: cyclonedx-json
+          artifact-name: sbom.cdx.json
+          path: ${{ inputs.working-directory }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom
+          path: ${{ inputs.working-directory }}/sbom.cdx.json
+
+  gate:
+    needs: [secrets, sast, sca, iac, policy, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all gates passed
+        run: |
+          if [[ "${{ needs.secrets.result }}" != "success" ]]; then echo "FAIL: secrets"; exit 1; fi
+          if [[ "${{ needs.sast.result }}" != "success" ]]; then echo "FAIL: sast"; exit 1; fi
+          if [[ "${{ needs.sca.result }}" != "success" ]]; then echo "FAIL: sca"; exit 1; fi
+          if [[ "${{ needs.iac.result }}" != "success" ]]; then echo "FAIL: iac"; exit 1; fi
+          if [[ "${{ needs.policy.result }}" != "success" ]]; then echo "FAIL: policy"; exit 1; fi
+          if [[ "${{ needs.build.result }}" != "success" ]]; then echo "FAIL: build"; exit 1; fi
+          echo "All gates passed."
