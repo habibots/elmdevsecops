@@ -1,0 +1,15 @@
+rules:
+  - id: square-token-only-via-wrapper
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: |
+      SQUARE_ACCESS_TOKEN must only be accessed via the canonical wrapper module
+      (any file at lib/square-client.{ts,js} or app/src/lib/square-client.{ts,js}).
+      Direct env access elsewhere is a security policy violation.
+    paths:
+      exclude:
+        - "**/lib/square-client.ts"
+        - "**/lib/square-client.js"
+        - "app/src/lib/square-client.ts"
+        - "app/src/lib/square-client.js"
+    pattern: process.env.SQUARE_ACCESS_TOKEN
