@@ -205,3 +205,63 @@ jobs:
           if [[ "${{ needs.policy.result }}" != "success" ]]; then echo "FAIL: policy"; exit 1; fi
           if [[ "${{ needs.build.result }}" != "success" ]]; then echo "FAIL: build"; exit 1; fi
           echo "All gates passed."
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm ci
+      - name: Build
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+        run: npm run build --if-present
+      - name: Generate SBOM (CycloneDX)
+        uses: anchore/sbom-action@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v0
+        with:
+          format: cyclonedx-json
+          artifact-name: sbom.cdx.json
+          path: ${{ inputs.working-directory }}
+      - name: Package release artifact
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [[ -d dist ]]; then tar -czf release.tar.gz dist
+          elif [[ -d .next ]]; then tar -czf release.tar.gz .next
+          elif [[ -d build ]]; then tar -czf release.tar.gz build
+          elif [[ -d .open-next ]]; then tar -czf release.tar.gz .open-next
+          else echo "No build output directory found"; exit 1
+          fi
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      - name: Sign release artifact (keyless via Sigstore)
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          cosign sign-blob --yes \
+            --bundle release.cosign.bundle \
+            release.tar.gz
+      - name: Attach SLSA build provenance
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1.4.4
+        with:
+          subject-path: ${{ inputs.working-directory }}/release.tar.gz
+      - name: Publish release artifacts to GitHub Release
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        with:
+          files: |
+            ${{ inputs.working-directory }}/release.tar.gz
+            ${{ inputs.working-directory }}/sbom.cdx.json
+            ${{ inputs.working-directory }}/release.cosign.bundle
