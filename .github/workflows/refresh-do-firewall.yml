@@ -1,0 +1,19 @@
+name: Refresh DO firewall (GH runner IPs)
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # every Monday 06:00 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - run: ./tools/scripts/refresh-gh-runner-ips.sh
+        env:
+          DO_FIREWALL_ID: ${{ secrets.DO_FIREWALL_ID }}
+          HOME_IP: ${{ secrets.HOME_IP }}
