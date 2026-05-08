@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    gitleaks:
+      run: gitleaks protect --staged --redact --no-banner
+    actionlint:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: actionlint {staged_files}
+
+pre-push:
+  commands:
+    reminder:
+      run: |
+        echo "Reminder: run /security-review in Claude Code before significant pushes (defense in depth: deterministic CI gates run regardless)."
