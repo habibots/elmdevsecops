@@ -1,0 +1,39 @@
+rules:
+  - id: webhook-must-verify-signature
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: |
+      Webhook handlers must verify HMAC signature before processing payload.
+      Required pattern: read `x-*-signature` header, compute HMAC-SHA256 of raw body using webhook key,
+      and reject (401) if they don't match — BEFORE calling any processing function.
+    paths:
+      include:
+        - "**/api/webhooks/**"
+        - "**/api/webhook/**"
+        - "**/webhooks/**"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              export async function POST($REQ: $T) {
+                ...
+                $PROCESS(...);
+                ...
+              }
+          - pattern: |
+              export async function POST($REQ) {
+                ...
+                $PROCESS(...);
+                ...
+              }
+      - pattern-not: |
+          export async function POST(...) {
+            ...
+            if ($SIG !== $EXPECTED) { ... }
+            ...
+          }
+      - pattern-not: |
+          export async function POST(...) {
+            ...
+            if (!$VALID) { ... }
+            ...
+          }
