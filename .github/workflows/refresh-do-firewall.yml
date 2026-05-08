@@ -9,8 +9,8 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: digitalocean/action-doctl@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - run: ./tools/scripts/refresh-gh-runner-ips.sh
