@@ -1,0 +1,19 @@
+name: drift-nightly
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+  attestations: write
+
+jobs:
+  rescan:
+    uses: ./.github/workflows/_security-base.yml
+    with:
+      site-type: ${{ vars.SITE_TYPE }}
+      scan-containers: ${{ vars.SCAN_CONTAINERS == 'true' }}
+      working-directory: ${{ vars.WORKING_DIRECTORY != '' && vars.WORKING_DIRECTORY || '.' }}
