@@ -1,0 +1,10 @@
+# Default — habibots owns everything in the meta-repo.
+*                                @habibots
+
+# Sensitive areas — explicit ownership for clarity.
+/.github/                        @habibots
+/policy/                         @habibots
+/tools/semgrep-custom/           @habibots
+/workflows-templates/            @habibots
+/docs/security-policy.md         @habibots
+/docs/runbooks/                  @habibots
