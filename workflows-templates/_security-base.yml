@@ -205,6 +205,9 @@ jobs:
           # cover the workflow-injection / unsafe-permission rules we care
           # about. Re-enable per-repo if GHAS / a richer token is available.
           online-audits: 'false'
+          # Severity-gating per docs/security-policy.md §3: only High blocks
+          # CI; Medium/Low surface for triage but don't fail the merge gate.
+          min-severity: 'high'
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -227,6 +230,8 @@ jobs:
             echo "No Dockerfile found; skipping container scan"
             exit 0
           fi
+      - name: Ensure .trivyignore exists (action requires file to be present)
+        run: touch .trivyignore
       - uses: aquasecurity/trivy-action@b2933f565dbc598b29947660e66259e3c7bc8561 # v0.20.0
         with:
           image-ref: local-image:scan
