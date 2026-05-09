@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Block direct pushes to main. Override (only when intentional):  ALLOW_MAIN_PUSH=1 git push <args>
+# Install in each repo:  cp tools/git-hooks/pre-push <repo>/.git/hooks/pre-push && chmod +x <repo>/.git/hooks/pre-push
+set -euo pipefail
+
+protected_branch='main'
+allow=${ALLOW_MAIN_PUSH:-0}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" == "refs/heads/$protected_branch" ]]; then
+    if [[ "$allow" != "1" ]]; then
+      echo "❌ Direct push to '$protected_branch' is blocked by pre-push hook." >&2
+      echo "   Normal flow: push to 'devops' and open a PR." >&2
+      echo "   To override (rare!): ALLOW_MAIN_PUSH=1 git push <args>" >&2
+      exit 1
+    fi
+    echo "⚠️  ALLOW_MAIN_PUSH=1 — pushing to $protected_branch as authorized override." >&2
+  fi
+done
+
+exit 0
