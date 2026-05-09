@@ -1,0 +1,95 @@
+name: security
+on:
+  push:
+    branches: [main, devops]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install conftest
+        run: |
+          curl -fsSL -o /tmp/conftest.tar.gz \
+            https://github.com/open-policy-agent/conftest/releases/download/v0.50.0/conftest_0.50.0_Linux_x86_64.tar.gz
+          tar xzf /tmp/conftest.tar.gz -C /tmp
+          sudo mv /tmp/conftest /usr/local/bin/
+          conftest --version
+      - name: Run policy unit tests
+        run: conftest verify policy/
+
+  yaml-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Validate all YAML files parse
+        run: |
+          shopt -s globstar
+          for f in **/*.yml **/*.yaml; do
+            python3 -c "import yaml; yaml.safe_load(open('$f'))"
+          done
+      - name: actionlint
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash
+          ./actionlint
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: bash syntax check on all scripts
+        run: |
+          for f in $(find tools -name '*.sh'); do
+            bash -n "$f" && echo "OK: $f"
+          done
+
+  semgrep-rules-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+      - name: Square wrapper rule against fixtures
+        run: |
+          BAD=$(semgrep --config tools/semgrep-custom/square-token-wrapper.yaml tools/semgrep-custom/tests/square-bad.ts --json 2>/dev/null | jq '.results | length')
+          GOOD=$(semgrep --config tools/semgrep-custom/square-token-wrapper.yaml tools/semgrep-custom/tests/square-good.ts --json 2>/dev/null | jq '.results | length')
+          echo "bad=$BAD good=$GOOD"
+          [[ "$BAD" == "1" ]] && [[ "$GOOD" == "0" ]] || exit 1
+      - name: Webhook signature rule against fixtures
+        run: |
+          BAD=$(semgrep --config tools/semgrep-custom/webhook-signature.yaml tools/semgrep-custom/tests/webhooks/webhook-bad.ts --json 2>/dev/null | jq '.results | length')
+          GOOD=$(semgrep --config tools/semgrep-custom/webhook-signature.yaml tools/semgrep-custom/tests/webhooks/webhook-good.ts --json 2>/dev/null | jq '.results | length')
+          echo "bad=$BAD good=$GOOD"
+          [[ "$BAD" == "1" ]] && [[ "$GOOD" == "0" ]] || exit 1
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  gate:
+    needs: [policy-tests, yaml-lint, shellcheck, semgrep-rules-fixtures, secrets-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all gates passed
+        run: |
+          if [[ "${{ needs.policy-tests.result }}" != "success" ]]; then echo "FAIL: policy-tests"; exit 1; fi
+          if [[ "${{ needs.yaml-lint.result }}" != "success" ]]; then echo "FAIL: yaml-lint"; exit 1; fi
+          if [[ "${{ needs.shellcheck.result }}" != "success" ]]; then echo "FAIL: shellcheck"; exit 1; fi
+          if [[ "${{ needs.semgrep-rules-fixtures.result }}" != "success" ]]; then echo "FAIL: semgrep-rules-fixtures"; exit 1; fi
+          if [[ "${{ needs.secrets-scan.result }}" != "success" ]]; then echo "FAIL: secrets-scan"; exit 1; fi
+          echo "All meta-repo security gates passed."
