@@ -103,7 +103,7 @@ jobs:
           sudo mv actionlint /usr/local/bin/
       - name: Run actionlint
         run: actionlint
-      - uses: woodruffw/zizmor-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - uses: zizmorcore/zizmor-action@b1d7e1fb5de872772f31590499237e7cce841e8e # v0.5.3
 
   container:
     if: ${{ inputs.scan-containers }}
@@ -181,7 +181,7 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: 'true'
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
         run: npm run build --if-present
-      - uses: anchore/sbom-action@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v0
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           format: cyclonedx-json
           artifact-name: sbom.cdx.json
@@ -232,7 +232,7 @@ jobs:
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
         run: npm run build --if-present
       - name: Generate SBOM (CycloneDX)
-        uses: anchore/sbom-action@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           format: cyclonedx-json
           artifact-name: sbom.cdx.json

@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: bash syntax check on all scripts
         run: |
-          for f in $(find tools -name '*.sh'); do
+          find tools -name '*.sh' -print0 | while IFS= read -r -d '' f; do
             bash -n "$f" && echo "OK: $f"
           done
 
