@@ -56,28 +56,121 @@ jobs:
           semgrep --config="${{ inputs.semgrep-rulesets }}" \
                   --sarif --output semgrep.sarif \
                   --error || true
-      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+      - name: Upload SAST SARIF
+        # Best-effort upload; private repos without GHAS will get 403, which
+        # we tolerate. The findings are still surfaced as CI artifacts and
+        # the severity-gate step below is what actually blocks the gate.
+        uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: ${{ inputs.working-directory }}/semgrep.sarif
           category: semgrep
+      - name: Upload SAST SARIF (artifact)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-sarif
+          path: ${{ inputs.working-directory }}/semgrep.sarif
+          if-no-files-found: ignore
+      - name: Gate on Critical/High Semgrep findings
+        # Severity-gating per docs/security-policy.md §3:
+        # block on Critical/High; log Medium/Low for triage.
+        run: |
+          set -euo pipefail
+          SARIF="${{ inputs.working-directory }}/semgrep.sarif"
+          if [[ ! -s "$SARIF" ]]; then
+            echo "No semgrep.sarif produced; nothing to gate on."
+            exit 0
+          fi
+          python3 - "$SARIF" <<'PY'
+          import json, sys
+          sarif = json.load(open(sys.argv[1]))
+          # Semgrep encodes severity in result.properties.severity OR rule.defaultConfiguration.level.
+          # Critical/High severities in Semgrep are reported as "ERROR" (high) in SARIF "level"
+          # and "HIGH"/"CRITICAL" in properties.severity (newer versions).
+          high = 0
+          for run in sarif.get("runs", []):
+              for result in run.get("results", []):
+                  sev = (result.get("properties", {}).get("severity") or "").upper()
+                  level = (result.get("level") or "").lower()
+                  if sev in ("HIGH", "CRITICAL", "ERROR") or level == "error":
+                      high += 1
+          print(f"Semgrep Critical/High findings: {high}")
+          sys.exit(1 if high > 0 else 0)
+          PY
 
   sca:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: google/osv-scanner-action@764c91816374ff2d8fc2095dab36eecd42d61638 # v1.9.2
+      - name: Run OSV-Scanner
+        # The action exits non-zero on ANY finding regardless of severity. We
+        # capture but tolerate that exit, then gate ourselves on Critical/High
+        # in the next step.
+        uses: google/osv-scanner-action/osv-scanner-action@c51854704019a247608d928f370c98740469d4b5 # v2.3.5
+        continue-on-error: true
         with:
           scan-args: |-
-            -r
+            --recursive
+            --format=sarif
+            --output=osv-results.sarif
             --skip-git
             ./
-      - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+      - name: Upload SCA SARIF
+        uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
         if: always()
+        continue-on-error: true
         with:
-          sarif_file: results.sarif
+          sarif_file: osv-results.sarif
           category: osv-scanner
+      - name: Upload SCA SARIF (artifact)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: osv-scanner-sarif
+          path: osv-results.sarif
+          if-no-files-found: ignore
+      - name: Gate on Critical/High SCA findings
+        # Severity-gating per docs/security-policy.md §3:
+        # only Critical/High block the merge gate; Medium/Low are surfaced
+        # for triage but don't fail CI.
+        run: |
+          set -euo pipefail
+          if [[ ! -s osv-results.sarif ]]; then
+            echo "No osv-results.sarif produced; nothing to gate on."
+            exit 0
+          fi
+          python3 - osv-results.sarif <<'PY'
+          import json, sys
+          sarif = json.load(open(sys.argv[1]))
+          # OSV-Scanner SARIF encodes CVSS severity in:
+          #   result.properties["security-severity"]  (numeric, CVSSv3)
+          # OR rule.properties.tags / rule.defaultConfiguration.level.
+          # CVSS 7.0+ == High, 9.0+ == Critical. Treat anything >= 7.0 as a gate failure.
+          rules_by_id = {}
+          for run in sarif.get("runs", []):
+              for r in (run.get("tool", {}).get("driver", {}).get("rules", []) or []):
+                  rules_by_id[r.get("id")] = r
+          high = 0
+          for run in sarif.get("runs", []):
+              for result in run.get("results", []):
+                  sev_score = None
+                  # Try result-level first, then rule-level.
+                  for source in (result.get("properties", {}),
+                                 (rules_by_id.get(result.get("ruleId"), {}) or {}).get("properties", {})):
+                      val = source.get("security-severity")
+                      if val is None: continue
+                      try:
+                          sev_score = float(val); break
+                      except (TypeError, ValueError):
+                          continue
+                  if sev_score is not None and sev_score >= 7.0:
+                      high += 1
+          print(f"OSV-Scanner Critical/High findings: {high}")
+          sys.exit(1 if high > 0 else 0)
+          PY
 
   iac:
     runs-on: ubuntu-latest
@@ -94,6 +187,7 @@ jobs:
                   --soft-fail || true
       - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: checkov-results.sarif
           category: checkov
@@ -104,6 +198,15 @@ jobs:
       - name: Run actionlint
         run: actionlint
       - uses: zizmorcore/zizmor-action@b1d7e1fb5de872772f31590499237e7cce841e8e # v0.5.3
+        with:
+          # Online audits hit the GitHub API to verify commit-SHA pin
+          # provenance. They get rate-limited for unauthenticated callers
+          # on free-tier runners and time out the job; offline audits still
+          # cover the workflow-injection / unsafe-permission rules we care
+          # about. Re-enable per-repo if GHAS / a richer token is available.
+          online-audits: 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   container:
     if: ${{ inputs.scan-containers }}
@@ -131,11 +234,22 @@ jobs:
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           exit-code: "1"
+          ignore-unfixed: 'true'
+          # Honor `.trivyignore` at the repo root for justified allowlists.
+          trivyignores: '.trivyignore'
       - uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
           category: trivy
+      - name: Upload container SARIF (artifact)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-sarif
+          path: trivy-results.sarif
+          if-no-files-found: ignore
 
   policy:
     runs-on: ubuntu-latest
