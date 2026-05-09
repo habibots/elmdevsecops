@@ -1,4 +1,4 @@
-# echoeslabwebsite — Workspace
+# elmdevsecops — Workspace
 
 Meta-repo for the three production sites managed under the Echoes Lab umbrella, plus the shared DevOps tooling that hardens them.
 
@@ -28,7 +28,7 @@ The full design lives in `docs/specs/2026-05-07-website-hardening-design.md`; th
 ## Repo layout
 
 ```
-echoeslabwebsite/
+elmdevsecops/
 ├── GlobalManagement/             # Astro static site (vendored sub-repo)
 ├── sacred-portal-wellness/       # Next.js + Square (vendored sub-repo)
 ├── antiphazeprod/                # Astro SSR + Pretix (vendored sub-repo)
@@ -67,8 +67,8 @@ The `_security-base.yml` and `_drift-nightly.yml` templates in `workflows-templa
 ## Quickstart
 
 ```bash
-git clone https://github.com/<owner>/echoeslabwebsite.git
-cd echoeslabwebsite
+git clone https://github.com/<owner>/elmdevsecops.git
+cd elmdevsecops
 
 # Initialise lefthook in each site repo (one-time per clone)
 for r in GlobalManagement sacred-portal-wellness antiphazeprod; do

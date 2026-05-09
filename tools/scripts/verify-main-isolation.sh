@@ -4,10 +4,10 @@
 set -uo pipefail
 
 REPOS=(
-  "/Users/uspharoh/Projects/echoeslabwebsite"
-  "/Users/uspharoh/Projects/echoeslabwebsite/GlobalManagement"
-  "/Users/uspharoh/Projects/echoeslabwebsite/sacred-portal-wellness"
-  "/Users/uspharoh/Projects/echoeslabwebsite/antiphazeprod"
+  "/Users/uspharoh/Projects/elmdevsecops"
+  "/Users/uspharoh/Projects/elmdevsecops/GlobalManagement"
+  "/Users/uspharoh/Projects/elmdevsecops/sacred-portal-wellness"
+  "/Users/uspharoh/Projects/elmdevsecops/antiphazeprod"
 )
 
 FAIL=0

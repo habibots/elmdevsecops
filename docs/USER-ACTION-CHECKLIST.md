@@ -49,7 +49,7 @@ The original recon agent's "leaked credentials" picture was partially wrong, in 
   ```
   Then:
   ```bash
-  cd ~/Projects/echoeslabwebsite
+  cd ~/Projects/elmdevsecops
   ./tools/scripts/scrub-secrets.sh ./GlobalManagement '' /tmp/secret-replacements.txt
   ```
   (Empty string for path — only `--replace-text` will run, no path removal.) Then `cd GlobalManagement && git push --force --all`. Then `shred -u /tmp/secret-replacements.txt`.
@@ -101,7 +101,7 @@ Follow `docs/runbooks/cloudflare-bootstrap.md` step by step. High-level:
   ```
 - [ ] **Verify** with the smoke-test scripts:
   ```bash
-  cd ~/Projects/echoeslabwebsite
+  cd ~/Projects/elmdevsecops
   ./tools/scripts/test-headers.sh https://antiphazeprod.com
   ./tools/scripts/test-headers.sh https://tickets.antiphazeprod.com
   ./tools/scripts/test-tls.sh antiphazeprod.com
@@ -128,7 +128,7 @@ Follow `docs/runbooks/cloudflare-bootstrap.md` step by step. High-level:
   Save the private key contents to 1Password. Note the public key (printed during keygen).
 - [ ] **Replace placeholder in `.sops.yaml`:**
   ```bash
-  cd ~/Projects/echoeslabwebsite/antiphazeprod
+  cd ~/Projects/elmdevsecops/antiphazeprod
   sed -i.bak "s|REPLACE_WITH_PRODUCTION_AGE_PUBLIC_KEY|$(cat ~/.age/antiphaze-prod.key.pub)|" infrastructure/sops/.sops.yaml
   rm infrastructure/sops/.sops.yaml.bak
   git add infrastructure/sops/.sops.yaml && git commit -m "ops(antiphaze): set production age public key for SOPS"
@@ -148,7 +148,7 @@ Follow `docs/runbooks/cloudflare-bootstrap.md` step by step. High-level:
   ```
 - [ ] **For sacred-portal: migrate runtime secrets to wrangler:**
   ```bash
-  cd ~/Projects/echoeslabwebsite/sacred-portal-wellness/app
+  cd ~/Projects/elmdevsecops/sacred-portal-wellness/app
   echo "<value>" | wrangler secret put SQUARE_ACCESS_TOKEN
   echo "<value>" | wrangler secret put SQUARE_APPLICATION_ID
   echo "<value>" | wrangler secret put SQUARE_LOCATION_ID
@@ -179,13 +179,13 @@ Follow `docs/runbooks/cloudflare-bootstrap.md` step by step. High-level:
   ```bash
   brew install lefthook
   for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-    cd ~/Projects/echoeslabwebsite/$r && lefthook install
+    cd ~/Projects/elmdevsecops/$r && lefthook install
   done
   ```
 - [ ] **Push each site's `devops` branch** to GitHub:
   ```bash
   for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-    cd ~/Projects/echoeslabwebsite/$r && git push -u origin devops
+    cd ~/Projects/elmdevsecops/$r && git push -u origin devops
   done
   ```
   Watch Actions tab for the workflow run. All 6 jobs (or 7 with container for antiphaze) should run in parallel.
@@ -233,7 +233,7 @@ These were noted in the final code review as APPROVED_WITH_NITS — non-blocking
 ## Final-state verification (run when everything above is done)
 
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 
 # Smoke-test all 3 production URLs:
 ./tools/scripts/test-headers.sh https://globalmanagement.com
@@ -254,4 +254,4 @@ cd ~/Projects/echoeslabwebsite
 # - Verify the released artifact: `cosign verify-blob --bundle release.cosign.bundle release.tar.gz` and `gh attestation verify --owner echoeslabmusic release.tar.gz`
 ```
 
-When all of the above pass, **the project is production-hardened.** Tag `v1.0.0` on the meta-repo (`cd ~/Projects/echoeslabwebsite && git tag v1.0.0 && git push origin v1.0.0`) and you're done.
+When all of the above pass, **the project is production-hardened.** Tag `v1.0.0` on the meta-repo (`cd ~/Projects/elmdevsecops && git tag v1.0.0 && git push origin v1.0.0`) and you're done.

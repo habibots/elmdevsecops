@@ -4,7 +4,7 @@
 
 **Goal:** Harden three production websites (GlobalManagement, sacred-portal-wellness, antiphazeprod) with Cloudflare-fronted infrastructure, automated TLS, OSS-only CI/CD security gates on every push, and committed AI audit artifacts per PR — at $0/month new spend.
 
-**Architecture:** Meta-DevOps repo (`echoeslabwebsite/`) holds shared workflows, policies, threat models, and runbooks. Each site repo gains a `devops` branch containing site-specific config and a thin `.github/workflows/security.yml` that calls the shared reusable workflow. All three sites are proxied through Cloudflare's free tier (DDoS, WAF, Universal SSL, Access for Pretix admin, Turnstile for forms). Local Claude Code via `/security-review` slash command is the AI reviewer; deterministic OSS scanners (gitleaks, Trivy, Semgrep OSS, OSV-Scanner, Checkov, ZAP, Syft, cosign) gate every push.
+**Architecture:** Meta-DevOps repo (`elmdevsecops/`) holds shared workflows, policies, threat models, and runbooks. Each site repo gains a `devops` branch containing site-specific config and a thin `.github/workflows/security.yml` that calls the shared reusable workflow. All three sites are proxied through Cloudflare's free tier (DDoS, WAF, Universal SSL, Access for Pretix admin, Turnstile for forms). Local Claude Code via `/security-review` slash command is the AI reviewer; deterministic OSS scanners (gitleaks, Trivy, Semgrep OSS, OSV-Scanner, Checkov, ZAP, Syft, cosign) gate every push.
 
 **Tech Stack:** GitHub Actions, Cloudflare (Pages, Workers, DNS, WAF, Access, Turnstile), Caddy (with xcaddy + caddy-dns/cloudflare), Docker Compose, Astro, Next.js, Pretix, Postgres, Redis, gitleaks, Trivy, Semgrep OSS, OSV-Scanner, Checkov, OWASP ZAP, Syft, cosign, Sigstore Rekor, SOPS+age, lefthook.
 
@@ -17,13 +17,13 @@
 - **[USER]** = task requires a human action (dashboard click, manual DNS change, secret rotation, account creation). Subagent prepares everything possible; user executes the human-only step.
 - **[AGENT]** = task can be fully executed by a subagent.
 - **[BOTH]** = subagent does the bulk; user does a small confirming step.
-- All file paths are absolute or anchored at `/Users/uspharoh/Projects/echoeslabwebsite/`.
-- Workspace root: `/Users/uspharoh/Projects/echoeslabwebsite/` (meta-repo, on `devops` branch).
-- Site repos: `echoeslabwebsite/{GlobalManagement,sacred-portal-wellness,antiphazeprod}/` (each on `devops` branch, never touch `main`).
+- All file paths are absolute or anchored at `/Users/uspharoh/Projects/elmdevsecops/`.
+- Workspace root: `/Users/uspharoh/Projects/elmdevsecops/` (meta-repo, on `devops` branch).
+- Site repos: `elmdevsecops/{GlobalManagement,sacred-portal-wellness,antiphazeprod}/` (each on `devops` branch, never touch `main`).
 
 ## File map (everything this plan creates or modifies)
 
-### Meta-repo (`echoeslabwebsite/`, devops branch)
+### Meta-repo (`elmdevsecops/`, devops branch)
 
 ```
 docs/
@@ -135,10 +135,10 @@ SECURITY-INCIDENT-2026-05-07.md              (new — IR report)
 ### Task 0.1: Document the IR template and seed three incident reports [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/docs/runbooks/incident-response-template.md`
-- Create: `echoeslabwebsite/GlobalManagement/SECURITY-INCIDENT-2026-05-07.md`
-- Create: `echoeslabwebsite/sacred-portal-wellness/SECURITY-INCIDENT-2026-05-07.md`
-- Create: `echoeslabwebsite/antiphazeprod/SECURITY-INCIDENT-2026-05-07.md`
+- Create: `elmdevsecops/docs/runbooks/incident-response-template.md`
+- Create: `elmdevsecops/GlobalManagement/SECURITY-INCIDENT-2026-05-07.md`
+- Create: `elmdevsecops/sacred-portal-wellness/SECURITY-INCIDENT-2026-05-07.md`
+- Create: `elmdevsecops/antiphazeprod/SECURITY-INCIDENT-2026-05-07.md`
 
 - [ ] **Step 1: Write IR template** at `docs/runbooks/incident-response-template.md` with the 9 sections from the design doc §9 (Summary, Timeline, Scope, Evidence, Remediation, Root cause, Preventive controls added, Control mapping, Lessons learned).
 
@@ -146,7 +146,7 @@ SECURITY-INCIDENT-2026-05-07.md              (new — IR report)
 
 - [ ] **Step 3: Commit each in its respective repo on `devops` branch:**
 ```bash
-cd echoeslabwebsite/GlobalManagement && git add SECURITY-INCIDENT-2026-05-07.md && git commit -m "docs(security): seed IR report for committed Web3Forms key"
+cd elmdevsecops/GlobalManagement && git add SECURITY-INCIDENT-2026-05-07.md && git commit -m "docs(security): seed IR report for committed Web3Forms key"
 cd ../sacred-portal-wellness && git add SECURITY-INCIDENT-2026-05-07.md && git commit -m "docs(security): seed IR report for committed Square production credentials"
 cd ../antiphazeprod && git add SECURITY-INCIDENT-2026-05-07.md && git commit -m "docs(security): seed IR report for committed SMTP2GO credentials"
 ```
@@ -195,7 +195,7 @@ Expected: review JSON output, reconcile every transaction against expected ledge
 ### Task 0.5: Scrub git history in all 3 repos [BOTH]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/scripts/scrub-secrets.sh`
+- Create: `elmdevsecops/tools/scripts/scrub-secrets.sh`
 
 - [ ] **Step 1: AGENT writes the scrub script** at `tools/scripts/scrub-secrets.sh`:
 ```bash
@@ -242,7 +242,7 @@ sq0idp-<actual-old-app-id>==>REDACTED_SQUARE_APP_ID
 
 - [ ] **Step 4: USER runs scrub on each repo** (note: must be done AFTER rotation):
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 ./tools/scripts/scrub-secrets.sh ./sacred-portal-wellness '.env.local' /tmp/secret-replacements.txt
 ./tools/scripts/scrub-secrets.sh ./GlobalManagement '.env' /tmp/secret-replacements.txt
 # antiphaze hardcoded SMTP — replace-text only, no path removal:
@@ -251,7 +251,7 @@ cd ./antiphazeprod && git filter-repo --replace-text /tmp/secret-replacements.tx
 
 - [ ] **Step 5: USER force-pushes the rewritten history** for each repo:
 ```bash
-cd ~/Projects/echoeslabwebsite/sacred-portal-wellness && git push --force --all && git push --force --tags
+cd ~/Projects/elmdevsecops/sacred-portal-wellness && git push --force --all && git push --force --tags
 cd ../GlobalManagement && git push --force --all && git push --force --tags
 cd ../antiphazeprod && git push --force --all && git push --force --tags
 ```
@@ -267,7 +267,7 @@ shred -u /tmp/secret-replacements.txt 2>/dev/null || rm -f /tmp/secret-replaceme
 
 - [ ] **Step 9: AGENT commits the scrub script** to the meta-repo:
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add tools/scripts/scrub-secrets.sh
 git commit -m "tools: add git-filter-repo scrub script for secrets remediation"
 ```
@@ -275,9 +275,9 @@ git commit -m "tools: add git-filter-repo scrub script for secrets remediation"
 ### Task 0.6: Add `.env*` to gitignore in all 3 repos [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/GlobalManagement/.gitignore`
-- Modify: `echoeslabwebsite/sacred-portal-wellness/.gitignore`
-- Modify: `echoeslabwebsite/antiphazeprod/.gitignore`
+- Modify: `elmdevsecops/GlobalManagement/.gitignore`
+- Modify: `elmdevsecops/sacred-portal-wellness/.gitignore`
+- Modify: `elmdevsecops/antiphazeprod/.gitignore`
 
 - [ ] **Step 1: AGENT reads each repo's existing `.gitignore`** to confirm what's already there.
 
@@ -294,13 +294,13 @@ git commit -m "tools: add git-filter-repo scrub script for secrets remediation"
 
 - [ ] **Step 3: AGENT commits in each repo** on `devops` branch:
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo> && git add .gitignore && git commit -m "chore(security): expand .gitignore to block .env* and key material"
+cd ~/Projects/elmdevsecops/<repo> && git add .gitignore && git commit -m "chore(security): expand .gitignore to block .env* and key material"
 ```
 
 - [ ] **Step 4: AGENT verifies no current `.env*` files are tracked** in any repo:
 ```bash
 for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-  cd ~/Projects/echoeslabwebsite/$r
+  cd ~/Projects/elmdevsecops/$r
   git ls-files | grep -E '^\.env' && echo "TRACKED in $r" || echo "OK in $r"
 done
 ```
@@ -315,8 +315,8 @@ Expected: "OK in <repo>" for all three. If TRACKED, run `git rm --cached <file>`
 ### Task 1.1: Upgrade `@astrojs/node` adapter to Node 22 LTS [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/antiphazeprod/website/package.json`
-- Modify: `echoeslabwebsite/antiphazeprod/website/Dockerfile`
+- Modify: `elmdevsecops/antiphazeprod/website/package.json`
+- Modify: `elmdevsecops/antiphazeprod/website/Dockerfile`
 
 - [ ] **Step 1: AGENT reads** `antiphazeprod/website/package.json` and `antiphazeprod/website/Dockerfile`.
 
@@ -337,19 +337,19 @@ FROM node:22-alpine AS runtime
 
 - [ ] **Step 4: AGENT runs `npm install`** in the `antiphazeprod/website/` directory to resolve the new lockfile:
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod/website && npm install
+cd ~/Projects/elmdevsecops/antiphazeprod/website && npm install
 ```
 Expected: `package-lock.json` updates without errors.
 
 - [ ] **Step 5: AGENT runs the local build** to verify Node 22 compatibility:
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod/website && npm run build
+cd ~/Projects/elmdevsecops/antiphazeprod/website && npm run build
 ```
 Expected: build completes without errors. If errors occur, capture them and fail the task — do not proceed.
 
 - [ ] **Step 6: AGENT commits** on `devops` branch:
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git add website/package.json website/package-lock.json website/Dockerfile
 git commit -m "fix(antiphaze): upgrade Node 16 (EOL) to Node 22 LTS — addresses CVE-2024-22019"
 ```
@@ -357,7 +357,7 @@ git commit -m "fix(antiphaze): upgrade Node 16 (EOL) to Node 22 LTS — addresse
 ### Task 1.2: Bind Postgres and Redis to internal Docker network only [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/antiphazeprod/infrastructure/docker-compose.yml`
+- Modify: `elmdevsecops/antiphazeprod/infrastructure/docker-compose.yml`
 
 - [ ] **Step 1: AGENT reads** the current `infrastructure/docker-compose.yml`.
 
@@ -371,14 +371,14 @@ git commit -m "fix(antiphaze): upgrade Node 16 (EOL) to Node 22 LTS — addresse
 
 - [ ] **Step 6: AGENT runs** the modified compose file syntax check:
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod/infrastructure
+cd ~/Projects/elmdevsecops/antiphazeprod/infrastructure
 docker compose config --quiet
 ```
 Expected: no error.
 
 - [ ] **Step 7: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git add infrastructure/docker-compose.yml
 git commit -m "fix(antiphaze): bind postgres/redis to internal docker network only; cap_drop ALL"
 ```
@@ -386,7 +386,7 @@ git commit -m "fix(antiphaze): bind postgres/redis to internal docker network on
 ### Task 1.3: Remove SMTP credential fallback from contact.ts [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/antiphazeprod/website/src/pages/api/contact.ts`
+- Modify: `elmdevsecops/antiphazeprod/website/src/pages/api/contact.ts`
 
 - [ ] **Step 1: AGENT reads** the current `contact.ts`.
 
@@ -402,14 +402,14 @@ No string literals containing user/pass.
 
 - [ ] **Step 3: AGENT searches for any other hardcoded credential references:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git grep -nE 'mail\.smtp2go\.com|smtp_user|smtp_pass' -- src/ infrastructure/ || echo "OK"
 ```
 Expected: only env-driven references.
 
 - [ ] **Step 4: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git add website/src/pages/api/contact.ts
 git commit -m "fix(antiphaze): remove SMTP credential fallback; require env vars"
 ```
@@ -461,7 +461,7 @@ sudo fail2ban-client status sshd
 ### Task 1.5: Auto-refresh GitHub Actions runner IPs in DO firewall [AGENT + USER]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/scripts/refresh-gh-runner-ips.sh`
+- Create: `elmdevsecops/tools/scripts/refresh-gh-runner-ips.sh`
 
 - [ ] **Step 1: AGENT writes the IP-refresh script** at `tools/scripts/refresh-gh-runner-ips.sh`:
 ```bash
@@ -493,7 +493,7 @@ doctl compute firewall update "$FIREWALL_ID" \
 ```
 Make executable.
 
-- [ ] **Step 2: AGENT writes a sibling GitHub Action** at `echoeslabwebsite/.github/workflows/refresh-do-firewall.yml` that runs the script weekly:
+- [ ] **Step 2: AGENT writes a sibling GitHub Action** at `elmdevsecops/.github/workflows/refresh-do-firewall.yml` that runs the script weekly:
 ```yaml
 name: Refresh DO firewall (GH runner IPs)
 on:
@@ -516,7 +516,7 @@ jobs:
 
 - [ ] **Step 4: AGENT commits both files:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add tools/scripts/refresh-gh-runner-ips.sh .github/workflows/refresh-do-firewall.yml
 git commit -m "ops: weekly DO firewall refresh of GH Actions runner IPs"
 ```
@@ -532,13 +532,13 @@ git commit -m "ops: weekly DO firewall refresh of GH Actions runner IPs"
 ### Task 2.1: Cloudflare account & zone setup runbook [USER]
 
 **Files:**
-- Create: `echoeslabwebsite/docs/runbooks/cloudflare-bootstrap.md`
+- Create: `elmdevsecops/docs/runbooks/cloudflare-bootstrap.md`
 
 - [ ] **Step 1: AGENT writes the bootstrap runbook** documenting every dashboard click required. Sections: account creation, zone add per domain, NS record change at registrar, DNS proxy enablement, SSL/TLS mode = Full (strict), Always Use HTTPS = on, Min TLS = 1.2, HSTS = off (we set in code/headers), Bot Fight Mode = on, WAF Managed Rules = on, OWASP Core Ruleset = on.
 
 - [ ] **Step 2: AGENT commits the runbook:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add docs/runbooks/cloudflare-bootstrap.md
 git commit -m "docs(cloudflare): bootstrap runbook for free-tier proxy setup"
 ```
@@ -578,13 +578,13 @@ git commit -m "docs(cloudflare): bootstrap runbook for free-tier proxy setup"
 ### Task 2.3: Deploy GlobalManagement to Cloudflare Pages [USER + AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/GlobalManagement/astro.config.mjs` (verify static output)
+- Modify: `elmdevsecops/GlobalManagement/astro.config.mjs` (verify static output)
 
 - [ ] **Step 1: AGENT verifies Astro is configured for static output** by reading `astro.config.mjs`. Expected: `output: 'static'` is present. If not, AGENT adds it.
 
 - [ ] **Step 2: AGENT runs a clean build** to confirm `dist/` is produced:
 ```bash
-cd ~/Projects/echoeslabwebsite/GlobalManagement && npm ci && npm run build && ls dist/
+cd ~/Projects/elmdevsecops/GlobalManagement && npm ci && npm run build && ls dist/
 ```
 Expected: HTML files present.
 
@@ -617,9 +617,9 @@ Expected: HTML files present.
 ### Task 2.5: Add Cloudflare Turnstile to all contact forms [USER + AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/GlobalManagement/src/components/ContactForm.astro` (or equivalent)
-- Modify: `echoeslabwebsite/sacred-portal-wellness/app/src/app/contact/page.tsx` (or equivalent)
-- Modify: `echoeslabwebsite/antiphazeprod/website/src/pages/contact.astro` (or equivalent)
+- Modify: `elmdevsecops/GlobalManagement/src/components/ContactForm.astro` (or equivalent)
+- Modify: `elmdevsecops/sacred-portal-wellness/app/src/app/contact/page.tsx` (or equivalent)
+- Modify: `elmdevsecops/antiphazeprod/website/src/pages/contact.astro` (or equivalent)
 
 - [ ] **Step 1: USER creates a Turnstile site** in Cloudflare dashboard → Turnstile → Add Site. Choose "Managed" widget mode. One site per domain. Capture site keys (public) and secret keys (server-side).
 
@@ -650,7 +650,7 @@ if (!verifyJson.success) {
 
 - [ ] **Step 5: AGENT commits in each site repo:**
 ```bash
-cd ~/Projects/echoeslabwebsite/<site> && git add . && git commit -m "feat(security): add Cloudflare Turnstile to contact form"
+cd ~/Projects/elmdevsecops/<site> && git add . && git commit -m "feat(security): add Cloudflare Turnstile to contact form"
 ```
 
 - [ ] **Step 6: USER manually tests** each contact form post-deploy, confirms Turnstile widget appears and submission works.
@@ -662,7 +662,7 @@ cd ~/Projects/echoeslabwebsite/<site> && git add . && git commit -m "feat(securi
 ### Task 3.1: GlobalManagement `_headers` file [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/GlobalManagement/public/_headers`
+- Create: `elmdevsecops/GlobalManagement/public/_headers`
 
 - [ ] **Step 1: AGENT creates the `_headers` file:**
 ```
@@ -676,7 +676,7 @@ cd ~/Projects/echoeslabwebsite/<site> && git add . && git commit -m "feat(securi
 
 - [ ] **Step 2: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite/GlobalManagement
+cd ~/Projects/elmdevsecops/GlobalManagement
 git add public/_headers
 git commit -m "feat(security): add CSP/HSTS/security headers via _headers"
 ```
@@ -692,7 +692,7 @@ Expected: all 5 headers present.
 ### Task 3.2: sacred-portal `next.config.js` security headers [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/sacred-portal-wellness/next.config.js` (or `next.config.mjs` / `next.config.ts` — check)
+- Modify: `elmdevsecops/sacred-portal-wellness/next.config.js` (or `next.config.mjs` / `next.config.ts` — check)
 
 - [ ] **Step 1: AGENT reads** the existing Next config to determine file extension and current shape.
 
@@ -727,7 +727,7 @@ module.exports = {
 
 - [ ] **Step 3: AGENT runs the dev build** to confirm config loads:
 ```bash
-cd ~/Projects/echoeslabwebsite/sacred-portal-wellness && npm ci && npm run build
+cd ~/Projects/elmdevsecops/sacred-portal-wellness && npm ci && npm run build
 ```
 Expected: build succeeds.
 
@@ -742,9 +742,9 @@ git commit -m "feat(security): add CSP/HSTS/security headers in next.config"
 ### Task 3.3: antiphaze Caddyfile + xcaddy Docker image [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/antiphazeprod/infrastructure/caddy/Dockerfile`
-- Modify: `echoeslabwebsite/antiphazeprod/infrastructure/Caddyfile`
-- Modify: `echoeslabwebsite/antiphazeprod/infrastructure/docker-compose.yml`
+- Create: `elmdevsecops/antiphazeprod/infrastructure/caddy/Dockerfile`
+- Modify: `elmdevsecops/antiphazeprod/infrastructure/Caddyfile`
+- Modify: `elmdevsecops/antiphazeprod/infrastructure/docker-compose.yml`
 
 - [ ] **Step 1: AGENT creates the xcaddy Dockerfile** at `infrastructure/caddy/Dockerfile`:
 ```dockerfile
@@ -813,13 +813,13 @@ services:
 
 - [ ] **Step 5: AGENT runs a local validation:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod/infrastructure
+cd ~/Projects/elmdevsecops/antiphazeprod/infrastructure
 docker compose config --quiet
 ```
 
 - [ ] **Step 6: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git add infrastructure/caddy/Dockerfile infrastructure/Caddyfile infrastructure/docker-compose.yml
 git commit -m "feat(antiphaze): xcaddy with cloudflare DNS plugin; DNS-01 ACME; security headers"
 ```
@@ -838,7 +838,7 @@ curl -sI https://tickets.antiphazeprod.com | grep -iE 'strict-transport'
 ### Task 3.4: TLS smoke test script [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/scripts/test-tls.sh`
+- Create: `elmdevsecops/tools/scripts/test-tls.sh`
 
 - [ ] **Step 1: AGENT writes the smoke-test script:**
 ```bash
@@ -868,7 +868,7 @@ Expected: "TLS baseline PASS: google.com".
 
 - [ ] **Step 3: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add tools/scripts/test-tls.sh
 git commit -m "tools: TLS baseline smoke test (Mozilla Intermediate)"
 ```
@@ -876,7 +876,7 @@ git commit -m "tools: TLS baseline smoke test (Mozilla Intermediate)"
 ### Task 3.5: Headers smoke-test script [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/scripts/test-headers.sh`
+- Create: `elmdevsecops/tools/scripts/test-headers.sh`
 
 - [ ] **Step 1: AGENT writes the script:**
 ```bash
@@ -910,7 +910,7 @@ exit $FAIL
 
 - [ ] **Step 3: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add tools/scripts/test-headers.sh
 git commit -m "tools: security headers smoke test"
 ```
@@ -922,9 +922,9 @@ git commit -m "tools: security headers smoke test"
 ### Task 4.1: SOPS+age setup for antiphaze [USER + AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/antiphazeprod/infrastructure/sops/.sops.yaml`
-- Create: `echoeslabwebsite/antiphazeprod/infrastructure/sops/prod.env.example`
-- Create: `echoeslabwebsite/antiphazeprod/infrastructure/sops/prod.env.enc` (encrypted)
+- Create: `elmdevsecops/antiphazeprod/infrastructure/sops/.sops.yaml`
+- Create: `elmdevsecops/antiphazeprod/infrastructure/sops/prod.env.example`
+- Create: `elmdevsecops/antiphazeprod/infrastructure/sops/prod.env.enc` (encrypted)
 
 - [ ] **Step 1: USER installs sops and age** locally:
 ```bash
@@ -995,7 +995,7 @@ services:
 
 - [ ] **Step 9: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod
+cd ~/Projects/elmdevsecops/antiphazeprod
 git add infrastructure/sops/.sops.yaml infrastructure/sops/prod.env.example infrastructure/sops/prod.env.enc infrastructure/scripts/decrypt-env.sh
 git commit -m "feat(antiphaze): SOPS+age secrets; encrypted prod.env in repo"
 ```
@@ -1003,11 +1003,11 @@ git commit -m "feat(antiphaze): SOPS+age secrets; encrypted prod.env in repo"
 ### Task 4.2: sacred-portal — migrate from `.env.local` to `wrangler secret` [USER + AGENT]
 
 **Files:**
-- Delete: `echoeslabwebsite/sacred-portal-wellness/.env.local` (already removed in Phase 0 history scrub; ensure not re-committed)
+- Delete: `elmdevsecops/sacred-portal-wellness/.env.local` (already removed in Phase 0 history scrub; ensure not re-committed)
 
 - [ ] **Step 1: USER runs** for each secret:
 ```bash
-cd ~/Projects/echoeslabwebsite/sacred-portal-wellness
+cd ~/Projects/elmdevsecops/sacred-portal-wellness
 echo "<value>" | wrangler secret put SQUARE_ACCESS_TOKEN
 echo "<value>" | wrangler secret put SQUARE_APPLICATION_ID
 echo "<value>" | wrangler secret put SQUARE_LOCATION_ID
@@ -1048,8 +1048,8 @@ Expected: all expected names present, values not displayed.
 ### Task 5.1: Pre-commit hooks via lefthook [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/pre-commit-config.yaml` (template)
-- Create per site: `echoeslabwebsite/<site>/lefthook.yml`
+- Create: `elmdevsecops/tools/pre-commit-config.yaml` (template)
+- Create per site: `elmdevsecops/<site>/lefthook.yml`
 
 **Note:** We use lefthook (single binary, no Python dep, faster than pre-commit framework).
 
@@ -1076,7 +1076,7 @@ pre-push:
 - [ ] **Step 2: AGENT copies the file** to each site repo as `lefthook.yml`:
 ```bash
 for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-  cp tools/pre-commit-config.yaml ~/Projects/echoeslabwebsite/$r/lefthook.yml
+  cp tools/pre-commit-config.yaml ~/Projects/elmdevsecops/$r/lefthook.yml
 done
 ```
 
@@ -1084,7 +1084,7 @@ done
 ```bash
 brew install lefthook
 for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-  cd ~/Projects/echoeslabwebsite/$r && lefthook install
+  cd ~/Projects/elmdevsecops/$r && lefthook install
 done
 ```
 
@@ -1096,14 +1096,14 @@ useDefault = true
 
 - [ ] **Step 5: AGENT commits in each site repo:**
 ```bash
-cd ~/Projects/echoeslabwebsite/<site>
+cd ~/Projects/elmdevsecops/<site>
 git add lefthook.yml .gitleaks.toml
 git commit -m "feat(security): pre-commit hooks (gitleaks, actionlint, eslint)"
 ```
 
 - [ ] **Step 6: AGENT commits the shared template** in the meta-repo:
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add tools/pre-commit-config.yaml
 git commit -m "tools: shared lefthook pre-commit config template"
 ```
@@ -1111,9 +1111,9 @@ git commit -m "tools: shared lefthook pre-commit config template"
 ### Task 5.2: Custom Semgrep rules — Square wrapper enforcement [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/semgrep-custom/square-token-wrapper.yaml`
-- Create: `echoeslabwebsite/tools/semgrep-custom/tests/square-bad.ts`
-- Create: `echoeslabwebsite/tools/semgrep-custom/tests/square-good.ts`
+- Create: `elmdevsecops/tools/semgrep-custom/square-token-wrapper.yaml`
+- Create: `elmdevsecops/tools/semgrep-custom/tests/square-bad.ts`
+- Create: `elmdevsecops/tools/semgrep-custom/tests/square-good.ts`
 
 - [ ] **Step 1: AGENT writes the failing test fixtures** first.
   `tools/semgrep-custom/tests/square-bad.ts`:
@@ -1153,7 +1153,7 @@ rules:
 
 - [ ] **Step 3: AGENT runs the rule** against the test fixtures:
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 npx semgrep --config tools/semgrep-custom/square-token-wrapper.yaml tools/semgrep-custom/tests/square-bad.ts
 # Expect: 1 finding
 npx semgrep --config tools/semgrep-custom/square-token-wrapper.yaml tools/semgrep-custom/tests/square-good.ts
@@ -1169,9 +1169,9 @@ git commit -m "tools(semgrep): custom rule — SQUARE_ACCESS_TOKEN only via wrap
 ### Task 5.3: Custom Semgrep rule — webhook signature verification [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/semgrep-custom/webhook-signature.yaml`
-- Create: `echoeslabwebsite/tools/semgrep-custom/tests/webhook-bad.ts`
-- Create: `echoeslabwebsite/tools/semgrep-custom/tests/webhook-good.ts`
+- Create: `elmdevsecops/tools/semgrep-custom/webhook-signature.yaml`
+- Create: `elmdevsecops/tools/semgrep-custom/tests/webhook-bad.ts`
+- Create: `elmdevsecops/tools/semgrep-custom/tests/webhook-good.ts`
 
 - [ ] **Step 1: AGENT writes test fixtures.**
   `webhook-bad.ts`:
@@ -1238,8 +1238,8 @@ git commit -m "tools(semgrep): custom rule — webhook handlers must verify HMAC
 ### Task 5.4: OPA/Conftest policies — Docker compose hardening [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/policy/containers.rego`
-- Create: `echoeslabwebsite/policy/containers_test.rego`
+- Create: `elmdevsecops/policy/containers.rego`
+- Create: `elmdevsecops/policy/containers_test.rego`
 
 - [ ] **Step 1: AGENT writes the policy test file FIRST:**
 ```rego
@@ -1274,7 +1274,7 @@ test_deny_privileged if {
 
 - [ ] **Step 2: AGENT runs the tests** (expecting failures since policy not yet written):
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 docker run --rm -v $(pwd)/policy:/policy openpolicyagent/conftest:v0.50.0 verify /policy
 ```
 Expected: 4 tests, all fail.
@@ -1317,14 +1317,14 @@ Expected: 4 tests pass.
 
 - [ ] **Step 5: AGENT runs the policy against the actual antiphaze compose file:**
 ```bash
-cd ~/Projects/echoeslabwebsite/antiphazeprod/infrastructure
+cd ~/Projects/elmdevsecops/antiphazeprod/infrastructure
 docker run --rm -v $(pwd):/project -v $(pwd)/../../policy:/policy openpolicyagent/conftest:v0.50.0 test /project/docker-compose.yml -p /policy
 ```
 Expected: 0 violations (after Phase 1 fixes are in place).
 
 - [ ] **Step 6: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add policy/containers.rego policy/containers_test.rego
 git commit -m "feat(policy): conftest rules for docker compose hardening"
 ```
@@ -1332,8 +1332,8 @@ git commit -m "feat(policy): conftest rules for docker compose hardening"
 ### Task 5.5: OPA/Conftest policies — GitHub Actions hardening [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/policy/github-actions.rego`
-- Create: `echoeslabwebsite/policy/github-actions_test.rego`
+- Create: `elmdevsecops/policy/github-actions.rego`
+- Create: `elmdevsecops/policy/github-actions_test.rego`
 
 - [ ] **Step 1: AGENT writes test fixtures and tests** (mirror of Task 5.4 structure):
    - Reject any `uses: <action>@<branch-or-tag>` (must be SHA-pinned)
@@ -1353,7 +1353,7 @@ git commit -m "feat(policy): conftest rules for GitHub Actions hardening"
 ### Task 5.6: Reusable `_security-base.yml` workflow (the core gate) [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/workflows-templates/_security-base.yml`
+- Create: `elmdevsecops/workflows-templates/_security-base.yml`
 
 - [ ] **Step 1: AGENT writes the reusable workflow.** This is the most important file in the project.
 ```yaml
@@ -1467,7 +1467,7 @@ jobs:
 
 - [ ] **Step 2: AGENT validates with `actionlint`:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 docker run --rm -v $(pwd):/repo rhysd/actionlint:latest /repo/workflows-templates/_security-base.yml
 ```
 Expected: no errors.
@@ -1481,11 +1481,11 @@ git commit -m "feat(ci): reusable security-base workflow with 6 parallel gating 
 ### Task 5.7: Per-site `security.yml` workflows [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/GlobalManagement/.github/workflows/security.yml`
-- Create: `echoeslabwebsite/sacred-portal-wellness/.github/workflows/security.yml`
-- Create: `echoeslabwebsite/antiphazeprod/.github/workflows/security.yml`
+- Create: `elmdevsecops/GlobalManagement/.github/workflows/security.yml`
+- Create: `elmdevsecops/sacred-portal-wellness/.github/workflows/security.yml`
+- Create: `elmdevsecops/antiphazeprod/.github/workflows/security.yml`
 
-**Note:** Since the reusable workflow lives in `echoeslabwebsite/` (a separate repo), each site's caller must reference it via the published path. There are two viable approaches:
+**Note:** Since the reusable workflow lives in `elmdevsecops/` (a separate repo), each site's caller must reference it via the published path. There are two viable approaches:
 
 **Approach A (chosen):** Vendor the reusable workflow into each site repo's `.github/workflows/_security-base.yml` and call it locally via `uses: ./.github/workflows/_security-base.yml`. Sync drift by a meta-repo CI check (Task 5.8).
 
@@ -1544,7 +1544,7 @@ jobs:
 
 - [ ] **Step 3: AGENT commits in each site repo:**
 ```bash
-cd ~/Projects/echoeslabwebsite/<site>
+cd ~/Projects/elmdevsecops/<site>
 git add .github/workflows/_security-base.yml .github/workflows/security.yml
 git commit -m "ci(security): add reusable security base + per-site caller"
 ```
@@ -1552,7 +1552,7 @@ git commit -m "ci(security): add reusable security base + per-site caller"
 - [ ] **Step 4: USER pushes each devops branch** to GitHub:
 ```bash
 for r in GlobalManagement sacred-portal-wellness antiphazeprod; do
-  cd ~/Projects/echoeslabwebsite/$r && git push -u origin devops
+  cd ~/Projects/elmdevsecops/$r && git push -u origin devops
 done
 ```
 
@@ -1561,7 +1561,7 @@ done
 ### Task 5.8: Drift detection — sync `_security-base.yml` across repos [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/.github/workflows/sync-base-workflow.yml`
+- Create: `elmdevsecops/.github/workflows/sync-base-workflow.yml`
 
 - [ ] **Step 1: AGENT writes a meta-repo workflow** that, when `workflows-templates/_security-base.yml` changes on the meta-repo's devops branch, opens PRs in each of the 3 site repos to update their copy.
 
@@ -1590,7 +1590,7 @@ jobs:
           git config user.email "echoeslab-bot@users.noreply.github.com"
           git checkout -b sync-security-base-$(date +%Y%m%d)
           git add .github/workflows/_security-base.yml
-          git diff --quiet --cached || (git commit -m "ci: sync _security-base.yml from echoeslabwebsite meta-repo" && git push -u origin HEAD && gh pr create --title "Sync _security-base.yml" --body "Automated sync from echoeslabwebsite meta-repo." --base devops)
+          git diff --quiet --cached || (git commit -m "ci: sync _security-base.yml from elmdevsecops meta-repo" && git push -u origin HEAD && gh pr create --title "Sync _security-base.yml" --body "Automated sync from elmdevsecops meta-repo." --base devops)
         env:
           GH_TOKEN: ${{ secrets.SYNC_PAT }}
 ```
@@ -1599,7 +1599,7 @@ jobs:
 
 - [ ] **Step 3: AGENT commits:**
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 git add .github/workflows/sync-base-workflow.yml
 git commit -m "ci(meta): fan out _security-base.yml changes to site repos"
 ```
@@ -1607,7 +1607,7 @@ git commit -m "ci(meta): fan out _security-base.yml changes to site repos"
 ### Task 5.9: Drift detection — nightly rescan [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/workflows-templates/_drift-nightly.yml`
+- Create: `elmdevsecops/workflows-templates/_drift-nightly.yml`
 - Add to each site repo: `.github/workflows/_drift-nightly.yml`
 
 - [ ] **Step 1: AGENT writes the nightly workflow:**
@@ -1654,7 +1654,7 @@ jobs:
 ### Task 6.1: Cosign keyless signing on releases [AGENT]
 
 **Files:**
-- Modify: `echoeslabwebsite/workflows-templates/_security-base.yml` (add release jobs)
+- Modify: `elmdevsecops/workflows-templates/_security-base.yml` (add release jobs)
 
 - [ ] **Step 1: AGENT adds a `release` job** to `_security-base.yml` triggered only on tag push:
 ```yaml
@@ -1700,7 +1700,7 @@ cosign verify-blob --bundle release.cosign.bundle release.tar.gz
 ### Task 6.2: Per-release compliance report (auto-generated) [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/tools/scripts/compliance-report.sh`
+- Create: `elmdevsecops/tools/scripts/compliance-report.sh`
 - Modify: `_security-base.yml` (add report job)
 
 - [ ] **Step 1: AGENT writes the report generator** that pulls the SARIF results, the SBOM, the attestation, and emits a markdown summary attached to the GitHub release.
@@ -1716,9 +1716,9 @@ cosign verify-blob --bundle release.cosign.bundle release.tar.gz
 ### Task 7.1: Per-repo `/security-review` slash command [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/GlobalManagement/.claude/commands/security-review.md`
-- Create: `echoeslabwebsite/sacred-portal-wellness/.claude/commands/security-review.md`
-- Create: `echoeslabwebsite/antiphazeprod/.claude/commands/security-review.md`
+- Create: `elmdevsecops/GlobalManagement/.claude/commands/security-review.md`
+- Create: `elmdevsecops/sacred-portal-wellness/.claude/commands/security-review.md`
+- Create: `elmdevsecops/antiphazeprod/.claude/commands/security-review.md`
 
 - [ ] **Step 1: AGENT writes a parametrized template** at `tools/security-review-template.md`:
 ```markdown
@@ -1777,14 +1777,14 @@ Write a markdown report with:
 
 - [ ] **Step 3: AGENT commits in each site repo:**
 ```bash
-cd ~/Projects/echoeslabwebsite/<site>
+cd ~/Projects/elmdevsecops/<site>
 git add .claude/commands/security-review.md
 git commit -m "feat(claude): /security-review slash command"
 ```
 
 - [ ] **Step 4: USER tests the command** in one repo:
 ```bash
-cd ~/Projects/echoeslabwebsite/sacred-portal-wellness
+cd ~/Projects/elmdevsecops/sacred-portal-wellness
 claude
 # In the Claude Code prompt:
 /security-review
@@ -1794,8 +1794,8 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 7.2: `.security-reviews/` directory convention [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/<site>/.security-reviews/.gitkeep` (per site)
-- Modify: `echoeslabwebsite/<site>/.gitignore` (ensure `.security-reviews/` is NOT ignored)
+- Create: `elmdevsecops/<site>/.security-reviews/.gitkeep` (per site)
+- Modify: `elmdevsecops/<site>/.gitignore` (ensure `.security-reviews/` is NOT ignored)
 
 - [ ] **Step 1: AGENT creates `.security-reviews/.gitkeep`** in each site repo and adds a README.md explaining the convention.
 
@@ -1804,7 +1804,7 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 7.3: CONTRIBUTING.md per repo with the workflow [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/<site>/CONTRIBUTING.md` (per site)
+- Create: `elmdevsecops/<site>/CONTRIBUTING.md` (per site)
 
 - [ ] **Step 1: AGENT writes a brief CONTRIBUTING.md** that documents:
    - "All work on `devops` branch; never push to `main` directly"
@@ -1822,10 +1822,10 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 8.1: Threat model docs [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/docs/threats/threat-model.md`
-- Create: `echoeslabwebsite/docs/threats/globalmanagement.md`
-- Create: `echoeslabwebsite/docs/threats/sacred-portal.md`
-- Create: `echoeslabwebsite/docs/threats/antiphaze.md`
+- Create: `elmdevsecops/docs/threats/threat-model.md`
+- Create: `elmdevsecops/docs/threats/globalmanagement.md`
+- Create: `elmdevsecops/docs/threats/sacred-portal.md`
+- Create: `elmdevsecops/docs/threats/antiphaze.md`
 
 - [ ] **Step 1: AGENT writes the cross-cutting threat model** referencing the design doc §3 (8 threats, 4 accepted risks).
 
@@ -1836,7 +1836,7 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 8.2: Security policy doc [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/docs/security-policy.md`
+- Create: `elmdevsecops/docs/security-policy.md`
 
 - [ ] **Step 1: AGENT writes the policy** capturing what's enforced by tooling vs. what's discipline:
    - Branch protection rules (lift from Task 5.10)
@@ -1851,10 +1851,10 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 8.3: Operational runbooks [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/docs/runbooks/secrets-rotation.md`
-- Create: `echoeslabwebsite/docs/runbooks/secrets-management.md`
-- Create: `echoeslabwebsite/docs/runbooks/cloudflare-fallback.md`
-- Create: `echoeslabwebsite/docs/runbooks/verify-release.md` (already partial from Task 6.1)
+- Create: `elmdevsecops/docs/runbooks/secrets-rotation.md`
+- Create: `elmdevsecops/docs/runbooks/secrets-management.md`
+- Create: `elmdevsecops/docs/runbooks/cloudflare-fallback.md`
+- Create: `elmdevsecops/docs/runbooks/verify-release.md` (already partial from Task 6.1)
 
 - [ ] **Step 1: AGENT writes `secrets-rotation.md`** — runbook for routine rotation of Square / SMTP / Cloudflare API token / Wrangler API token / SSH deploy key. Cadence: quarterly.
 
@@ -1870,8 +1870,8 @@ Expected: Claude reads the diff, runs the scanners, produces a markdown report.
 ### Task 8.4: Workspace README + CONTRIBUTING [AGENT]
 
 **Files:**
-- Create: `echoeslabwebsite/README.md`
-- Create: `echoeslabwebsite/CONTRIBUTING.md`
+- Create: `elmdevsecops/README.md`
+- Create: `elmdevsecops/CONTRIBUTING.md`
 
 - [ ] **Step 1: AGENT writes README.md** with: project overview, file map, quickstart, links to design doc and plan, status badges (CI runs).
 

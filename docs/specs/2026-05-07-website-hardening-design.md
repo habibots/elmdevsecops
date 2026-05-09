@@ -4,7 +4,7 @@
 **Author:** Munib Hosny
 **Status:** Draft, awaiting approval before implementation plan
 **Scope:** GlobalManagement, sacred-portal-wellness, antiphazeprod
-**Workspace:** `~/Projects/echoeslabwebsite/`
+**Workspace:** `~/Projects/elmdevsecops/`
 **All work on `devops` branch in each repo. `main` is not touched.**
 
 ---
@@ -278,7 +278,7 @@ tickets.antiphazeprod.com {
 ### 6.1 Layout
 
 ```
-echoeslabwebsite/
+elmdevsecops/
 ├── docs/
 │   ├── specs/
 │   │   ├── 2026-05-07-website-hardening-design.md   ← this doc

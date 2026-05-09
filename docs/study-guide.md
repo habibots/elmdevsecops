@@ -45,7 +45,7 @@ You can't talk about controls without first talking about what you're defending 
 Four repos, all on `devops` branches. `main` was never touched.
 
 ```
-~/Projects/echoeslabwebsite/                     ← meta-repo (NEW, no GitHub remote yet)
+~/Projects/elmdevsecops/                     ← meta-repo (NEW, no GitHub remote yet)
 ├── docs/
 │   ├── specs/2026-05-07-website-hardening-design.md
 │   ├── plans/2026-05-07-website-hardening-plan.md
@@ -241,7 +241,7 @@ Each site has a different stack and a different attack surface. The shared CI ru
 
 > **How to talk about this:** "antiphaze is the most operationally complex of the three. Postgres/Redis live on the internal Docker network — never publicly addressable. Caddy uses DNS-01 ACME so we don't need port 80 open. Cloudflare Access gates the Pretix admin path with WebAuthn — credential stuffing literally cannot reach the login form. Secrets are SOPS-encrypted in the repo with age, so there's no SaaS dependency for secret management."
 
-### 4.4 The meta-repo (echoeslabwebsite — the platform)
+### 4.4 The meta-repo (elmdevsecops — the platform)
 
 **What it is:** the source of truth for shared security tooling. It holds:
 - The reusable CI workflow consumed by all 3 sites

@@ -1,6 +1,6 @@
 # Security Policy
 
-This document is the source of truth for **what is enforced by tooling vs what is enforced by discipline** across the three site repos (`GlobalManagement`, `sacred-portal-wellness`, `antiphazeprod`) and the meta-repo (`echoeslabwebsite`).
+This document is the source of truth for **what is enforced by tooling vs what is enforced by discipline** across the three site repos (`GlobalManagement`, `sacred-portal-wellness`, `antiphazeprod`) and the meta-repo (`elmdevsecops`).
 
 ## 1. Scope and intent
 

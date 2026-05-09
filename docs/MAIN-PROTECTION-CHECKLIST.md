@@ -5,7 +5,7 @@
 **Before you do anything else: run this verification once now to confirm the current state.**
 
 ```bash
-~/Projects/echoeslabwebsite/tools/scripts/verify-main-isolation.sh
+~/Projects/elmdevsecops/tools/scripts/verify-main-isolation.sh
 ```
 
 (Created in step A.0 below.) Expected output: every repo on `devops`, every `main` matching origin, no uncommitted changes, devops commits ahead of main only.
@@ -27,7 +27,7 @@ Already provided in this commit; runs the state check above. Make it part of mus
 For **each of the 3 site repos** (and optionally the meta-repo once it has a remote), run:
 
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 
 # Push the current branch to its same-named upstream — never push other branches by accident
 git config push.default current
@@ -43,7 +43,7 @@ Verify with `git config --list | grep -E '^(push|pull)\.'`.
 
 ### A.2 — Install a pre-push hook that blocks pushes to main
 
-Create `~/Projects/echoeslabwebsite/tools/git-hooks/pre-push` (one shared hook copied into each repo's `.git/hooks/`):
+Create `~/Projects/elmdevsecops/tools/git-hooks/pre-push` (one shared hook copied into each repo's `.git/hooks/`):
 
 ```bash
 #!/usr/bin/env bash
@@ -71,9 +71,9 @@ exit 0
 Then in each site repo:
 
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 mkdir -p .git/hooks
-cp ~/Projects/echoeslabwebsite/tools/git-hooks/pre-push .git/hooks/pre-push
+cp ~/Projects/elmdevsecops/tools/git-hooks/pre-push .git/hooks/pre-push
 chmod +x .git/hooks/pre-push
 ```
 
@@ -207,7 +207,7 @@ The current workflows don't push to main, but verify there's no future drift:
 ### D.1 — Audit every workflow
 
 ```bash
-cd ~/Projects/echoeslabwebsite
+cd ~/Projects/elmdevsecops
 
 # Search for any workflow that pushes, merges, or modifies main directly:
 for r in . GlobalManagement sacred-portal-wellness antiphazeprod; do
@@ -235,7 +235,7 @@ Open `workflows-templates/_security-base.yml` and confirm the release job is gat
 
 ```bash
 # Each repo:
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 # No Dependabot auto-merge:
 cat .github/dependabot.yml 2>/dev/null | grep -i 'automerge' || echo "no automerge in dependabot config"
 # No Mergify config:
@@ -253,7 +253,7 @@ Internalize these. Make them muscle memory.
 ### E.1 — Starting work
 
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 git fetch origin
 git checkout devops
 git pull --ff-only origin devops    # safe pull (refuses if diverged)
@@ -291,7 +291,7 @@ The pre-push hook (A.2) will block if you accidentally try to push to main.
 If `main` ever does receive a commit (e.g., a hotfix from someone else), bring devops up to date:
 
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 git checkout devops
 git fetch origin
 git rebase origin/main           # OR: git merge --no-ff origin/main
@@ -322,7 +322,7 @@ You **never** type `git push origin main`. Never. The branch protection (B.1) bl
 
 ## F. Pre-push pre-flight check (run this every time before pushing)
 
-Save as `~/Projects/echoeslabwebsite/tools/scripts/preflight.sh`. Source it or run it before any push.
+Save as `~/Projects/elmdevsecops/tools/scripts/preflight.sh`. Source it or run it before any push.
 
 ```bash
 #!/usr/bin/env bash
@@ -383,7 +383,7 @@ Make executable. Run before any `git push`.
 Repo                                     Current   main matches      devops    Working
                                          branch    origin/main       ahead     tree
 ─────────────────────────────────────────────────────────────────────────────────────
-echoeslabwebsite (meta)                  devops    n/a (no remote)   24        clean
+elmdevsecops (meta)                  devops    n/a (no remote)   24        clean
 GlobalManagement                         devops    YES               7         clean
 sacred-portal-wellness                   devops    YES               8         clean
 antiphazeprod                            devops    YES               11        clean
@@ -412,7 +412,7 @@ If any box is unchecked: stop, fix it, re-run.
 You should never need this, but if a commit accidentally lands on main:
 
 ```bash
-cd ~/Projects/echoeslabwebsite/<repo>
+cd ~/Projects/elmdevsecops/<repo>
 git fetch origin
 
 # 1. See what's there:
