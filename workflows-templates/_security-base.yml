@@ -52,8 +52,11 @@ jobs:
         run: pip install --quiet semgrep
       - name: Run Semgrep
         working-directory: ${{ inputs.working-directory }}
+        env:
+          # Pass rulesets via env to satisfy zizmor template-injection check.
+          SEMGREP_RULESETS: ${{ inputs.semgrep-rulesets }}
         run: |
-          semgrep --config="${{ inputs.semgrep-rulesets }}" \
+          semgrep --config="${SEMGREP_RULESETS}" \
                   --sarif --output semgrep.sarif \
                   --error || true
       - name: Upload SAST SARIF
@@ -76,9 +79,14 @@ jobs:
       - name: Gate on Critical/High Semgrep findings
         # Severity-gating per docs/security-policy.md §3:
         # block on Critical/High; log Medium/Low for triage.
+        env:
+          # Pass via env to avoid template-injection lint (zizmor).
+          # `inputs.*` are workflow_call args set by the calling workflow we
+          # own, so this is defense-in-depth, not patching a real bug.
+          WORKING_DIRECTORY: ${{ inputs.working-directory }}
         run: |
           set -euo pipefail
-          SARIF="${{ inputs.working-directory }}/semgrep.sarif"
+          SARIF="${WORKING_DIRECTORY}/semgrep.sarif"
           if [[ ! -s "$SARIF" ]]; then
             echo "No semgrep.sarif produced; nothing to gate on."
             exit 0
@@ -218,12 +226,14 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build local image
+        env:
+          # Pass via env to satisfy zizmor template-injection check.
+          WORKING_DIRECTORY: ${{ inputs.working-directory }}
         run: |
           # Try the working-directory's Dockerfile first, then fall back to common
           # infrastructure paths used by Pretix-style stacks.
-          WD="${{ inputs.working-directory }}"
-          if [[ -f "$WD/Dockerfile" ]]; then
-            docker build -t local-image:scan "$WD"
+          if [[ -f "${WORKING_DIRECTORY}/Dockerfile" ]]; then
+            docker build -t local-image:scan "${WORKING_DIRECTORY}"
           elif [[ -f infrastructure/docker/caddy/Dockerfile ]]; then
             docker build -t local-image:scan -f infrastructure/docker/caddy/Dockerfile infrastructure/docker/caddy/
           else
@@ -289,8 +299,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          # No cache: 'npm' here. setup-node's npm cache writes are
+          # triggerable from PRs, which a malicious lockfile could use to
+          # poison the cache for later push-to-main runs (zizmor
+          # cache-poisoning, High). Re-introduce only if cache key is bound
+          # to a verified-origin signal.
       - name: Install dependencies
         working-directory: ${{ inputs.working-directory }}
         run: npm ci
@@ -339,8 +352,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          # No npm cache here for the same reason as the build job — see
+          # comment there.
       - name: Install dependencies
         working-directory: ${{ inputs.working-directory }}
         run: npm ci
